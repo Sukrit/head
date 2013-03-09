@@ -126,10 +126,10 @@ static dJointID club_joint;
 
 // the current feedforward torque
 dReal club_joint_ff = 0;
-int state = IDLE;
+int state = WALK;
 int walk_start = 0;
 
-static dReal velocity;
+static dReal velocity = 1.0;
 static dReal stride_phase; 
 static dReal front_left_phase;
 static dReal front_right_phase;
@@ -181,10 +181,19 @@ void balance_control()
 	dReal force;
 	const dReal* pos = dBodyGetPosition(robot_bodies[12]); 
 	dReal temp_pos = pos[1];
-	const dReal *front_left = dBodyGetPosition(robot_bodies[0]);
-	const dReal *front_right = dBodyGetPosition(robot_bodies[2]);
+	//const dReal *front_left = dBodyGetPosition(robot_bodies[0]);
+	//const dReal *front_right = dBodyGetPosition(robot_bodies[2]);
 
+	dVector3 front_left;
+	dVector3 front_right; 
+	dBodyGetRelPointPos(robot_bodies[0], FOOT_LENGTH/2, 0, 0, front_left);
+	dBodyGetRelPointPos(robot_bodies[2], FOOT_LENGTH/2, 0, 0, front_right);
+
+	printf("current front_left is %f\n", front_left[2]);
+	printf("current front_right is %f\n", front_right[2]);
+	
 	force  = (min(front_left[2], front_right[2])-FOOT_THICKNESS/2)*Kp_force*50;
+	printf("current force is %f\n", force);
 	dBodyAddForce(robot_bodies[12], 0, 0, -force);
 
 	if (temp_pos !=0)
@@ -194,10 +203,20 @@ void balance_control()
 	}
 
 	pos = dBodyGetPosition(robot_bodies[17]);
-	const dReal *back_left = dBodyGetPosition(robot_bodies[1]);
-	const dReal *back_right = dBodyGetPosition(robot_bodies[3]);
+	//const dReal *back_left = dBodyGetPosition(robot_bodies[1]);
+	//const dReal *back_right = dBodyGetPosition(robot_bodies[3]);
 	temp_pos = pos[1];
+
 	
+	dVector3 back_left;
+	dVector3 back_right; 
+	dBodyGetRelPointPos(robot_bodies[1], FOOT_LENGTH/2, 0, 0, back_left);
+	dBodyGetRelPointPos(robot_bodies[3], FOOT_LENGTH/2, 0, 0, back_right);
+
+	printf("current front_left is %f\n", back_left[2]);
+	printf("current front_right is %f\n", back_right[2]);
+	
+
 	force  = (min(back_left[2], back_right[2])-FOOT_THICKNESS/2)*Kp_force*100;
 	dBodyAddForce(robot_bodies[17], 0, 0, -force);
 
@@ -206,7 +225,7 @@ void balance_control()
 		force  = pos[1]*Kp_force*200;
 		dBodyAddForce(robot_bodies[17], 0, -force, 0);
 	}
-	
+
 }
 
 void apply_virtual_forces_front_new()
@@ -215,11 +234,12 @@ void apply_virtual_forces_front_new()
 	dReal new_v_force;
 	const dReal* new_frame_position = dBodyGetPosition(robot_bodies[12]);
 	front_velocity = (new_frame_position[0] - front_frame_position)/(TIME_STEP*5);
+
 	dReal force = Kp_force*(initial_front_leg_frame_height - front_leg_frame_height) - Kd_force*(front_leg_frame_height - prev_front_leg_frame_height)/(TIME_STEP*5);
 	dReal v_force = Kv_force*(velocity - front_velocity);
 	prev_front_leg_frame_height = front_leg_frame_height;
 	front_frame_position = new_frame_position[0];
-	
+
 	int n = 0;
 	if (front_left_phase == 0)
 		n++;
@@ -231,7 +251,7 @@ void apply_virtual_forces_front_new()
 	{
 		new_force = force/n;
 		new_v_force = v_force/n;
-		
+
 		if (front_left_phase == 0)
 		{
 			dBodyAddForce(robot_bodies[0], -2*new_v_force, 0, -2*new_force);
@@ -239,7 +259,7 @@ void apply_virtual_forces_front_new()
 			for(int i=12;i<15;i++)
 				dBodyAddForce(robot_bodies[i], new_v_force, 0, new_force);
 		}
-
+		
 		if (front_right_phase == 0)
 		{
 			dBodyAddForce(robot_bodies[2], -2*new_v_force, 0, -2*new_force);
@@ -264,7 +284,7 @@ void apply_virtual_forces_back_new()
 	dReal v_force = Kv_force*(velocity - back_velocity);
 	prev_back_leg_frame_height = back_leg_frame_height;
 	back_frame_position = new_frame_position[0];
-	
+
 	int n = 0;
 	if (back_left_phase == 0)
 		n++;
@@ -276,7 +296,7 @@ void apply_virtual_forces_back_new()
 	{
 		new_force = force/n;
 		new_v_force = v_force/n;
-		
+
 		if (back_left_phase == 0)
 		{
 			dBodyAddForce(robot_bodies[1], -2*new_v_force, 0, -2*new_force);
@@ -307,7 +327,7 @@ void apply_virtual_forces_front()
 	dReal v_force = Kv_force *(velocity - vel[0]);
 	//dReal v_force = Kv_force *velocity;
 	prev_front_leg_frame_height = front_leg_frame_height;
-	
+
 	int n = 0;
 	if (front_left_phase == 0)
 		n++;
@@ -342,14 +362,14 @@ void apply_virtual_forces_front()
 			dBodyAddForce(robot_bodies[2], -new_v_force, 0, -new_force);
 			//dBodyAddForce(robot_bodies[12], 10*new_v_force, 0, new_force);
 			const dReal* force =  dBodyGetForce(robot_bodies[12]);
-			
+
 			//torque = cos(temp_angle+PI/4)*force[0];
 			torque = abs(cos(temp_angle+PI/4)*new_v_force);
 			dJointAddHingeTorque (robot_joints[22], torque );
 			//dBodyAddForceAtRelPos(robot_bodies[2],-FOOT_LENGTH/2,0,0, -new_v_force, 0, -new_force);
 			for(int i=8;i<13;i++)
 				dBodySetForce(robot_bodies[i+4], 2*(torque+PD_torques[20]),0,0);
-			
+
 		}
 		dBodyAddForce(robot_bodies[12], 10*v_force, 0, force);
 		//dBodyAddForce(robot_bodies[12], 10*v_force, 0, 0);		
@@ -362,7 +382,7 @@ void apply_virtual_forces_back()
 	dReal new_force;
 	dReal new_v_force;
 	const dReal* vel = dBodyGetLinearVel(robot_bodies[17]);
-	
+
 	dReal force = Kp_force*(initial_back_leg_frame_height - back_leg_frame_height) - Kd_force*(back_leg_frame_height - prev_back_leg_frame_height)/(TIME_STEP*5);
 	dReal v_force = Kv_force *(velocity  - vel[0]);
 	//dReal v_force = Kv_force *velocity;
@@ -383,14 +403,14 @@ void apply_virtual_forces_back()
 			temp_angle = dJointGetHingeAngle(robot_joints[1]);
 			dBodyAddForce(robot_bodies[1], -new_v_force, 0, -new_force);
 			const dReal* force =  dBodyGetForce(robot_bodies[17]);
-			
+
 			//dReal torque = cos(temp_angle+PI/4)*force[0];
 			dReal torque = abs(cos(temp_angle+PI/4)*new_v_force);
 			dJointAddHingeTorque (robot_joints[21], torque );			
-			
+
 			for(int i=8;i<13;i++)
 			dBodySetForce(robot_bodies[i+4], (torque+PD_torques[23]),0,0);		
-			
+
 			//dBodyAddForceAtRelPos(robot_bodies[1],-FOOT_LENGTH/2,0,0, -new_v_force, 0, -new_force);
 
 		}
@@ -400,15 +420,15 @@ void apply_virtual_forces_back()
 			temp_angle = dJointGetHingeAngle(robot_joints[3]);
 			dBodyAddForce(robot_bodies[3], -new_v_force, 0, -new_force);
 			const dReal* force =  dBodyGetForce(robot_bodies[17]);
-			
+
 			dReal torque = abs(cos(temp_angle+PI/4)*new_v_force);
 			//dReal torque = cos(temp_angle+PI/4)*force[0];
-			
+
 			dJointAddHingeTorque (robot_joints[23], torque );
-			
+
 			for(int i=8;i<13;i++)
 				dBodySetForce(robot_bodies[i+4], (torque+PD_torques[21]),0,0);		
-			
+
 			//dBodyAddForceAtRelPos(robot_bodies[3],-FOOT_LENGTH/2,0,0, -new_v_force, 0, -new_force);
 
 		}
@@ -443,8 +463,7 @@ void get_P2(dVector3 P1, const dReal *frame, dVector3 P2, int n)
 		P2[0] = frame[0] + 0.1 + FOOT_LENGTH/2;
 	else
 	{
-		printf("walk state is %d\n", walk_start);
-		
+
 		if (walk_start==0)
 			P2[0] = frame[0] + 0.05 + FOOT_LENGTH/2;
 		else
@@ -493,7 +512,7 @@ dReal get_back_leg_frame_height()
 	height = pos[2];
 	//const dReal* vel = dBodyGetLinearVel(robot_bodies[17]);
 
-	
+
 	//if((back_right_phase > 0) || (back_left_phase > 0 ))
 	{
 		//height = initial_back_leg_frame_height - (back_right_phase + back_left_phase)* velocity;
@@ -509,11 +528,12 @@ dReal get_front_leg_frame_height()
 	pos = dBodyGetPosition(robot_bodies[12]);
 	height = pos[2];
 	//const dReal* vel = dBodyGetLinearVel(robot_bodies[12]);
-	
+
 	//if((front_right_phase > 0) || (front_left_phase > 0 ))
 	{
 		//height = height - (front_right_phase + front_left_phase)* velocity*0.1;
 		height = initial_front_leg_frame_height + (1-(velocity-front_velocity))*0.05;
+		printf("desired height is %f\n", height);
 	}
 	return height;
 }
@@ -525,8 +545,8 @@ void update_leg_phase()
 	//front_left_P1 = dBodyGetPosition(robot_bodies[0]);
 	//back_left_P1 = dBodyGetPosition(robot_bodies[1]);
 
-				
-	if((stride_phase>0.2 && stride_phase<0.6)&&(back_right_phase < 0.9))
+
+	if((stride_phase>0.2 && stride_phase<0.6)&&(back_right_phase < 0.94))
 	{
 		back_right_phase = back_right_phase + TIME_STEP*5*2.5;
 	}
@@ -537,7 +557,7 @@ void update_leg_phase()
 		get_P2(back_right_P1, dBodyGetPosition(robot_bodies[17]),back_right_P2, -1);
 		back_right_phase = 0.0;
 	}
-	if((stride_phase>0.45 && stride_phase<0.85)&&(front_right_phase < 0.9))
+	if((stride_phase>0.45 && stride_phase<0.85)&&(front_right_phase < 0.97))
 	{
 		front_right_phase = front_right_phase + TIME_STEP*5*2.5;
 		walk_start = 1;
@@ -549,7 +569,7 @@ void update_leg_phase()
 		get_P2(front_right_P1, dBodyGetPosition(robot_bodies[12]),front_right_P2, 1);
 		front_right_phase = 0.0;
 	}
-	if((stride_phase>0.35 && stride_phase<0.95)||(front_left_phase > 0.9))
+	if((stride_phase>0.35 && stride_phase<0.95)||(front_left_phase > 0.97))
 	{
 		Front_left_P1 = dBodyGetPosition(robot_bodies[0]);
 		dReal_to_vector(Front_left_P1, front_left_P1);
@@ -560,7 +580,7 @@ void update_leg_phase()
 	{
 		front_left_phase = front_left_phase + TIME_STEP*5*2.5;
 	}
-	if((stride_phase>0.1 && stride_phase<0.7)||(back_left_phase > 0.9))
+	if((stride_phase>0.1 && stride_phase<0.7)||(back_left_phase > 0.94))
 	{
 		Back_left_P1 = dBodyGetPosition(robot_bodies[1]);
 		dReal_to_vector(Back_left_P1, back_left_P1);
@@ -618,15 +638,15 @@ void compute_pd_torques()
 		PD_torques[i] = Kp*(target_angles[(i-20)*2+1] + angle_error[i]) - Kd*dJointGetHingeAngleRate(robot_joints[i]);
 		prev_target_angles[(i-20)*2+1] = target_angles[(i-20)*2+1];
 	}
-	
+
 }
 
 void walk()
 {
 
-	
+
 	//stride_phase = walk_time*5 / WALK_STRIDE_TIME;
-	
+
 	stride_phase = stride_phase + TIME_STEP*5;
 
 	if ( stride_phase >= 1.0 )
@@ -646,14 +666,15 @@ void walk()
 	{
 		dJointAddHingeTorque (robot_joints[i], PD_torques[i] );
 	}
+
 	
-	/*
 	printf("stride phase is %f\n", stride_phase);
 	printf("back left stride phase is %f\n", back_left_phase);
 	printf("front left stride phase is %f\n", front_left_phase);
 	printf("back right stride phase is %f\n", back_right_phase);
 	printf("front right stride phase is %f\n", front_right_phase);
 
+	/*
 	printf("back left P1 is %f\n", back_left_P1[0]);
 	printf("back right P1 is %f\n", back_right_P1[0]);
 	printf("front left P1 is %f\n", front_left_P1[0]);
@@ -680,18 +701,19 @@ void walk()
 
 void control_robot()
 {
+	/*
   const dReal* pos = dBodyGetPosition(robot_bodies[12]);
 	dReal force = (pos[2] - initial_front_leg_frame_height)*10*100;
-	printf("initial front pos is %f\n", initial_front_leg_frame_height);
-	printf("current front pos is %f\n", pos[2]);
+	//printf("initial front pos is %f\n", initial_front_leg_frame_height);
+	//printf("current front pos is %f\n", pos[2]);
 	dBodyAddForce(robot_bodies[12],0,0,force);
 
 	const dReal* pos_new = dBodyGetPosition(robot_bodies[17]);
 	force = (pos_new[2] - initial_back_leg_frame_height)*10*50;
-	printf("initial back pos is %f\n", initial_back_leg_frame_height);
-	printf("current back pos is %f\n", pos_new[2]);
+	//printf("initial back pos is %f\n", initial_back_leg_frame_height);
+	//printf("current back pos is %f\n", pos_new[2]);
 	dBodyAddForce(robot_bodies[17],0,0,force);
-	
+*/
 }
 
 void state1()
@@ -771,6 +793,9 @@ void state_machine( )
 	{
 		walk_time = 0;
 		control_robot();
+
+		//if (time > 0.5)
+		//	state = WALK;
 	}
 	else if (state == WALK)
 	{
@@ -779,7 +804,7 @@ void state_machine( )
 		//state1();
 		//control_robot();
 	}
-	
+
   else
     {
       fprintf( stderr, "Unknown state %d in state_machine()\n", state );
@@ -819,7 +844,7 @@ static void nearCallback2( void *data, dGeomID a, dGeomID b )
         dVector3 pos2;
         dAddScaledVectors3(pos2, contacts[i].geom.pos, contacts[i].geom.normal, 1, 0.1);
         dsDrawLine(contacts[i].geom.pos, pos2);*/
-		
+
     }
 }
 
@@ -874,8 +899,14 @@ static void simLoop (int pause)
   // find collisions and add contact joints
   dSpaceCollide( space, 0, &nearCallback2  );
 
+  //dWorldSetQuickStepNumIterations (world, 5);
+ //dWorldSetQuickStepW(world,0.4);
+
   // step the simulation
-  dWorldStep( world, TIME_STEP );  
+
+	dWorldStep( world, TIME_STEP);  
+
+	printf("step is %f \n", dWorldGetQuickStepW (world));
 
   // increment time
   time += TIME_STEP*5;
@@ -883,7 +914,7 @@ static void simLoop (int pause)
 
   // remove all contact joints
   dJointGroupEmpty( contact_joint_group );
-	
+
   // now we draw everything
   unsigned ngeoms = dSpaceGetNumGeoms(space);
   for (unsigned i=0; i<ngeoms; ++i) {
@@ -948,14 +979,14 @@ void attach_joints()
   }
 
 	for (i=8; i<12; i++) {
-		
+
     robot_joints[i+12] = dJointCreateHinge (world,0);
     dJointAttach (robot_joints[i+12],robot_bodies[i],robot_bodies[i+13]);
     const dReal *a = dBodyGetPosition (robot_bodies[i]);
 	dJointSetHingeAnchor (robot_joints[i+12],a[0],a[1],2*SHANK_HEIGHT - FOOT_THICKNESS/2 );
 	//dJointSetHingeAnchor (robot_joints[i],a[0],a[1],a[2] + SHANK_HEIGHT/2);
     dJointSetHingeAxis (robot_joints[i+12],0,1,0);
-	
+
 	/*
 	robot_joints[i+12] = dJointCreateFixed(world,0);
 	dJointAttach(robot_joints[i+12], robot_bodies[i], robot_bodies[i+13]);
@@ -1022,9 +1053,9 @@ void attach_joints()
 	robot_joints[19] = dJointCreateFixed(world,0);
 	dJointAttach(robot_joints[19], robot_bodies[20], robot_bodies[18]);
 	dJointSetFixed (robot_joints[19]);
-	
 
-	
+
+
 	for (i=24; i<31; i++) {
     robot_joints[i] = dJointCreateHinge (world,0);
     dJointAttach (robot_joints[i],robot_bodies[i+1],robot_bodies[i+2]);
@@ -1032,14 +1063,14 @@ void attach_joints()
     dJointSetHingeAnchor (robot_joints[i],a[0]-TAIL_LENGTH/2,a[1],a[2]);
     dJointSetHingeAxis (robot_joints[i],0,1,0);
   }
-	
+
 	robot_joints[31] = dJointCreateHinge (world,0);
     dJointAttach (robot_joints[31],robot_bodies[25],robot_bodies[17]);
     const dReal *g = dBodyGetPosition (robot_bodies[17]);
     dJointSetHingeAnchor (robot_joints[31],g[0],g[1],g[2]);
     dJointSetHingeAxis (robot_joints[31],0,1,0);
-	
-	
+
+
 }
 
 void create_bodies_and_geoms()
@@ -1074,14 +1105,14 @@ void create_bodies_and_geoms()
     dGeomSetBody (robot_geoms[i],robot_bodies[i]);
   }
 
-	
 
-	
+
+
   dBodySetPosition (robot_bodies[4],LEG_X, LEG_Y, SHANK_Z);
   dBodySetPosition (robot_bodies[5],-LEG_X, LEG_Y2, SHANK_Z);
   dBodySetPosition (robot_bodies[6],LEG_X, -LEG_Y, SHANK_Z);
   dBodySetPosition (robot_bodies[7],-LEG_X, -LEG_Y2, SHANK_Z);
-	
+
   // THIGH
 	for (i=8; i<12; i++) {
     robot_bodies[i] = dBodyCreate (world);
@@ -1101,7 +1132,7 @@ void create_bodies_and_geoms()
   double temp_width = BOX_WIDTH;
   double temp_thickness = BOX_THICKNESS;
   double temp_mass = TORSO_BOX_MASS;
-	
+
 	  //TORSO
 	for (i=12; i<18; i++) {
     robot_bodies[i] = dBodyCreate (world);
@@ -1173,7 +1204,7 @@ void create_bodies_and_geoms()
 
 
 	double temp_tail_x = TAIL_X;
-	
+
 	//TAIL
 	for (i=25; i<33; i++) {
     robot_bodies[i] = dBodyCreate (world);
@@ -1188,7 +1219,7 @@ void create_bodies_and_geoms()
 	dBodySetRotation (robot_bodies[i], R);
 
 	temp_tail_x = temp_tail_x - TAIL_LENGTH;
-	
+
   }
  	
   n_robot_parts = 32;
@@ -1294,9 +1325,9 @@ void initialize( )
  front_velocity = 0.0;
 
  get_P2(front_left_P1, dBodyGetPosition(robot_bodies[12]),front_left_P2,1 );
-		
+
  get_P2(back_left_P1, dBodyGetPosition(robot_bodies[17]),back_left_P2,-1 );
-	
+
 
   for ( j = 0; j < MAX_N_ROBOT_PARTS; j++ )
     {	
